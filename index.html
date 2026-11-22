@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#fef08a">
+    <title>Our List — Yellow Notepad</title>
+    <!-- Load Tailwind CSS for layout and responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Clean Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Base typography and touch behavior */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: contain;
+        }
+
+        /* Warm yellow lined notepad paper surface */
+        .notepad-paper {
+            background-color: #fef9c3;
+            background-image:
+                linear-gradient(90deg, transparent 42px, #f87171 42px, #f87171 44px, transparent 44px),
+                repeating-linear-gradient(
+                    to bottom,
+                    transparent 0px,
+                    transparent 35px,
+                    rgba(180, 145, 40, 0.22) 35px,
+                    rgba(180, 145, 40, 0.22) 36px
+                );
+        }
+
+        /* Crisp ink-outlined card shadows & borders over yellow paper */
+        .tactile-card {
+            background-color: #fffef5;
+            border: 2px solid #292524;
+            box-shadow: 3px 3px 0px #292524;
+        }
+
+        .tactile-card-checked {
+            background-color: #fef08a;
+            border: 2px solid #78716c;
+            box-shadow: 1px 1px 0px #78716c;
+        }
+
+        /* Left-to-right drawn red-ink pen strikethrough */
+        .pen-strike-wrap {
+            position: relative;
+            display: inline-block;
+            padding: 0 3px;
+        }
+
+        .pen-strike-line {
+            position: absolute;
+            left: 0;
+            top: 52%;
+            width: 100%;
+            height: 3px;
+            background-color: #dc2626;
+            border-radius: 9999px;
+            transform-origin: left center;
+            transform: scaleX(0);
+            opacity: 0;
+            transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.1s ease;
+            pointer-events: none;
+        }
+
+        .item-checked .pen-strike-line {
+            opacity: 0.95;
+            transform: scaleX(1);
+        }
+
+        /* Highlighted important task pill & shadow */
+        .important-card {
+            background-color: #fef2f2 !important;
+            border: 2.5px solid #b91c1c !important;
+            box-shadow: 3px 3px 0px #b91c1c !important;
+        }
+
+        /* Tactile pop animation for checkmark */
+        @keyframes checkPop {
+            0% { transform: scale(0.75); }
+            55% { transform: scale(1.16); }
+            100% { transform: scale(1); }
+        }
+
+        .check-pop {
+            animation: checkPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        /* Hide scrollbars for clean mobile feel */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-[#fde047] text-[#1c1917] min-h-screen flex justify-center">
+
+    <!-- Mobile App Container with Yellow Notepad Styling -->
+    <div class="w-full max-w-md notepad-paper min-h-screen sm:min-h-[85vh] sm:my-6 sm:rounded-3xl sm:border-2 sm:border-[#292524] sm:shadow-[6px_6px_0px_#292524] flex flex-col relative overflow-hidden">
+
+        <!-- Top Notepad Binding Header -->
+        <header class="bg-[#fef08a] border-b-2 border-[#292524] text-[#1c1917] px-4 pt-5 pb-4 z-10 shrink-0">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-3">
+                    <!-- Notepad Badge with Dark Ink Outline -->
+                    <div class="w-11 h-11 rounded-2xl bg-[#2563eb] border-2 border-[#292524] shadow-[2px_2px_0px_#292524] flex items-center justify-center shrink-0">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-extrabold tracking-tight text-[#1c1917] leading-none">
+                            Our List
+                        </h1>
+                        <p id="item-counter" class="text-[#57534e] text-xs font-semibold mt-1">Loading items...</p>
+                    </div>
+                </div>
+
+                <!-- Header Action Buttons -->
+                <div class="flex items-center gap-2">
+                    <!-- Clear Checked Button -->
+                    <button type="button" id="clear-checked-btn" class="hidden bg-[#fee2e2] hover:bg-[#fecaca] px-3 py-2 rounded-xl items-center gap-1.5 text-xs font-bold text-[#b91c1c] border-2 border-[#292524] shadow-[2px_2px_0px_#292524] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        <span>Clear (<span id="checked-count">0</span>)</span>
+                    </button>
+
+                    <!-- Room Code & Share Modal Button -->
+                    <button type="button" id="share-btn" class="bg-[#fffef5] hover:bg-[#fef3c7] px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs font-bold text-[#1c1917] border-2 border-[#292524] shadow-[2px_2px_0px_#292524] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
+                        <span id="sync-dot" class="w-2.5 h-2.5 rounded-full bg-amber-500 border border-[#292524]"></span>
+                        <span id="list-code-display">Local</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Two-Tab Switcher: Shopping List vs To-Do List -->
+            <div class="grid grid-cols-2 gap-2 mt-3.5" role="tablist" aria-label="App sections">
+                <button
+                    type="button"
+                    id="tab-shopping-btn"
+                    role="tab"
+                    aria-selected="true"
+                    class="py-2 px-3 rounded-xl text-xs font-extrabold border-2 border-[#292524] bg-[#2563eb] text-white shadow-[2px_2px_0px_#292524] transition-all flex items-center justify-center gap-1.5"
+                >
+                    <span>Shopping List</span>
+                </button>
+                <button
+                    type="button"
+                    id="tab-todo-btn"
+                    role="tab"
+                    aria-selected="false"
+                    class="py-2 px-3 rounded-xl text-xs font-extrabold border-2 border-[#292524] bg-[#fffef5] text-[#1c1917] hover:bg-[#fef3c7] shadow-[2px_2px_0px_#292524] transition-all flex items-center justify-center gap-1.5"
+                >
+                    <span>To-Do List</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- TAB 1: Main Scrollable Shopping List Area -->
+        <main id="list-container" class="flex-1 overflow-y-auto px-4 pt-4 pb-28 space-y-3 no-scrollbar">
+            <!-- Loading State -->
+            <div id="loading-state" class="flex flex-col items-center justify-center py-20 text-[#292524]">
+                <svg class="w-8 h-8 animate-spin text-[#0f766e] mb-3" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-sm font-bold">Loading your list...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden flex-col items-center justify-center py-12 text-center px-6 bg-[#fffef5] rounded-2xl border-2 border-[#292524] shadow-[3px_3px_0px_#292524] mt-4">
+                <div class="w-14 h-14 bg-[#fef08a] text-[#1c1917] border-2 border-[#292524] rounded-2xl flex items-center justify-center mb-3 shadow-[2px_2px_0px_#292524]">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                </div>
+                <h3 class="text-[#1c1917] font-extrabold text-lg">Your notepad is empty!</h3>
+                <p class="text-[#57534e] text-sm mt-1 font-medium">Add items below and press Enter to keep typing.</p>
+            </div>
+
+            <!-- Unified Shopping List -->
+            <ul id="shopping-list" class="space-y-3"></ul>
+        </main>
+
+        <!-- TAB 2: Upcoming Planner + Mon-Sun Calendar Strip -->
+        <section id="todo-container" class="hidden flex-1 overflow-y-auto px-4 pt-4 pb-32 space-y-3.5 no-scrollbar">
+            <!-- Week Navigation & Calendar Strip -->
+            <div class="tactile-card rounded-2xl p-3 space-y-2.5">
+                <div class="flex items-center justify-between gap-1.5">
+                    <button
+                        type="button"
+                        id="prev-week-btn"
+                        aria-label="Previous week"
+                        class="w-8 h-8 rounded-xl border-2 border-[#292524] bg-[#fef08a] hover:bg-[#fde047] text-[#1c1917] font-extrabold flex items-center justify-center shadow-[1.5px_1.5px_0px_#292524] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none shrink-0"
+                    >
+                        ‹
+                    </button>
+                    <div class="text-center min-w-0 flex-1">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <span id="week-range-label" class="text-xs font-extrabold text-[#57534e] uppercase tracking-wide truncate">This Week</span>
+                            <button
+                                type="button"
+                                id="today-jump-btn"
+                                class="px-2 py-0.5 rounded-lg border border-[#292524] bg-[#e0f2fe] hover:bg-[#bae6fd] text-[#0369a1] text-[10px] font-extrabold uppercase tracking-wide shadow-[1px_1px_0px_#292524] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none shrink-0"
+                            >
+                                Today
+                            </button>
+                        </div>
+                        <div id="selected-day-label" class="text-base font-extrabold text-[#2563eb] leading-tight mt-0.5">Monday</div>
+                    </div>
+                    <button
+                        type="button"
+                        id="next-week-btn"
+                        aria-label="Next week"
+                        class="w-8 h-8 rounded-xl border-2 border-[#292524] bg-[#fef08a] hover:bg-[#fde047] text-[#1c1917] font-extrabold flex items-center justify-center shadow-[1.5px_1.5px_0px_#292524] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none shrink-0"
+                    >
+                        ›
+                    </button>
+                </div>
+
+                <!-- Monday to Sunday Calendar Buttons -->
+                <div id="week-calendar-grid" class="grid grid-cols-7 gap-1"></div>
+
+                <!-- View Mode Toggle: Coming Up Feed vs Selected Day -->
+                <div class="grid grid-cols-2 gap-1.5 pt-1 border-t border-[#e7e5e4]">
+                    <button
+                        type="button"
+                        id="view-upcoming-btn"
+                        class="py-1.5 px-2 rounded-xl text-[11px] font-extrabold border-2 border-[#292524] bg-[#0f766e] text-white shadow-[1.5px_1.5px_0px_#292524] transition-all"
+                    >
+                        Coming Up
+                    </button>
+                    <button
+                        type="button"
+                        id="view-selected-day-btn"
+                        class="py-1.5 px-2 rounded-xl text-[11px] font-extrabold border-2 border-[#292524] bg-[#fffef5] text-[#1c1917] hover:bg-[#fef3c7] shadow-[1.5px_1.5px_0px_#292524] transition-all"
+                    >
+                        Selected Day Only
+                    </button>
+                </div>
+            </div>
+
+            <!-- Empty To-Do State -->
+            <div id="todo-empty-state" class="hidden flex-col items-center justify-center py-9 text-center px-5 bg-[#fffef5] rounded-2xl border-2 border-[#292524] shadow-[3px_3px_0px_#292524]">
+                <h3 class="text-[#1c1917] font-extrabold text-lg">Nothing coming up</h3>
+                <p class="text-[#57534e] text-sm mt-1 font-medium">Type a task with a date below or pick a day above.</p>
+            </div>
+
+            <!-- Planner Feed / Tasks Container -->
+            <div id="todo-list" class="space-y-4"></div>
+        </section>
+
+        <!-- Bottom Sticky Input Bar for Tab 1 (Shopping List) -->
+        <div id="shopping-input-bar" class="fixed sm:absolute bottom-0 left-0 right-0 bg-[#fef08a] border-t-2 border-[#292524] px-4 py-3 z-30">
+            <form id="add-item-form" class="flex items-center gap-2.5">
+                <input
+                    type="text"
+                    id="item-input"
+                    placeholder=""
+                    aria-label="Add shopping item"
+                    autocomplete="off"
+                    class="flex-1 bg-[#fffef5] text-[#1c1917] placeholder-[#78716c] border-2 border-[#292524] rounded-2xl px-4 py-3 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-[#2563eb] transition-all"
+                >
+                <button
+                    type="submit"
+                    id="add-btn"
+                    aria-label="Add item"
+                    class="bg-[#0f766e] hover:bg-[#115e59] text-white font-bold rounded-2xl p-3.5 border-2 border-[#292524] shadow-[2px_2px_0px_#292524] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center shrink-0"
+                >
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                </button>
+            </form>
+        </div>
+
+        <!-- Bottom Sticky Input Bar for Tab 2 (Smart Date Planner + Important Toggle) -->
+        <div id="todo-input-bar" class="hidden fixed sm:absolute bottom-0 left-0 right-0 bg-[#fef08a] border-t-2 border-[#292524] px-4 py-3 z-30">
+            <form id="add-todo-form" class="flex items-center gap-2">
+                <button
+                    type="button"
+                    id="new-todo-important-btn"
+                    aria-pressed="false"
+                    aria-label="Mark task as important"
+                    title="Highlight as important"
+                    class="rounded-2xl p-3 border-2 border-[#292524] bg-[#fffef5] text-[#78716c] shadow-[2px_2px_0px_#292524] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all shrink-0"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                    </svg>
+                </button>
+                <input
+                    type="text"
+                    id="todo-input"
+                    placeholder=""
+                    aria-label="Add to-do task"
+                    autocomplete="off"
+                    class="flex-1 min-w-0 bg-[#fffef5] text-[#1c1917] placeholder-[#78716c] border-2 border-[#292524] rounded-2xl px-3.5 py-3 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-[#2563eb] transition-all"
+                >
+                <button
+                    type="submit"
+                    id="add-todo-btn"
+                    aria-label="Add task"
+                    class="bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold rounded-2xl p-3.5 border-2 border-[#292524] shadow-[2px_2px_0px_#292524] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center shrink-0"
+                >
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                </button>
+            </form>
+        </div>
+
+        <!-- Room Code / Link Modal -->
+        <div id="share-modal" class="hidden fixed inset-0 bg-[#1c1917]/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div class="bg-[#fffef5] border-2 border-[#292524] shadow-[5px_5px_0px_#292524] rounded-3xl max-w-sm w-full p-6 transform transition-all">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-extrabold text-[#1c1917]">List Room Code</h2>
+                    <button type="button" id="close-modal-btn" class="p-2 text-[#1c1917] hover:bg-[#fef08a] rounded-xl border-2 border-[#292524] bg-[#fffef5] shadow-[2px_2px_0px_#292524] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-sm text-[#44403c] font-medium leading-relaxed mb-4">
+                    This standalone version saves data locally in your browser. You can copy this link or switch room codes in the URL hash.
+                </p>
+
+                <div class="bg-[#fef9c3] p-3 rounded-2xl flex items-center justify-between gap-2 mb-4 border-2 border-[#292524]">
+                    <span id="share-url-text" class="text-xs text-[#1c1917] truncate font-mono font-semibold">Loading link...</span>
+                    <button type="button" id="copy-link-btn" class="bg-[#0f766e] hover:bg-[#115e59] text-white text-xs font-bold px-3.5 py-2 rounded-xl border-2 border-[#292524] shadow-[2px_2px_0px_#292524] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none shrink-0 transition-all">
+                        Copy Link
+                    </button>
+                </div>
+
+                <!-- Switch Room Code -->
+                <div class="border-t-2 border-[#e7e5e4] pt-4 mt-2">
+                    <label for="join-code-input" class="block text-xs font-extrabold text-[#44403c] uppercase tracking-wider mb-2">Switch room code</label>
+                    <form id="join-code-form" class="flex gap-2">
+                        <input type="text" id="join-code-input" placeholder="e.g. HOME-LIST" class="flex-1 bg-white text-[#1c1917] placeholder-[#78716c] border-2 border-[#292524] rounded-xl px-3 py-2 text-sm uppercase font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#2563eb]">
+                        <button type="submit" class="bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-extrabold px-4 py-2 rounded-xl border-2 border-[#292524] shadow-[2px_2px_0px_#292524] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all">Switch</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification Banner -->
+        <div id="toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2 bg-[#292524] text-[#fef08a] border-2 border-[#fef08a] text-xs font-bold px-4 py-2.5 rounded-full shadow-lg z-50 transition-opacity">
+            Copied!
+        </div>
+    </div>
+
+    <!-- Optional Live Sync Cloud Config (paste your own config here to sync across phones) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Leave as null to use local browser storage, or paste your project config object to enable live sync:
+        const LIVE_SYNC_CONFIG = null;
+        const LIVE_SYNC_APP_ID = 'our-list-live';
+
+        if (LIVE_SYNC_CONFIG && LIVE_SYNC_CONFIG.apiKey) {
+            (async () => {
+                try {
+                    const app = initializeApp(LIVE_SYNC_CONFIG);
+                    const auth = getAuth(app);
+                    const db = getFirestore(app);
+                    await signInAnonymously(auth);
+
+                    let suppressNextPush = false;
+
+                    function getRoomDocRef() {
+                        const roomCode = (window.location.hash || '#DEFAULT').replace('#', '').trim().toUpperCase() || 'DEFAULT';
+                        return doc(db, 'artifacts', LIVE_SYNC_APP_ID, 'public', 'data', 'rooms', roomCode);
+                    }
+
+                    let roomDocRef = getRoomDocRef();
+                    let unsubscribeSnapshot = null;
+
+                    function subscribeToRoom() {
+                        if (unsubscribeSnapshot) unsubscribeSnapshot();
+                        roomDocRef = getRoomDocRef();
+                        unsubscribeSnapshot = onSnapshot(roomDocRef, (snap) => {
+                            if (!snap.exists()) return;
+                            const remote = snap.data();
+                            if (!Array.isArray(remote.shopping) || !Array.isArray(remote.todos)) return;
+                            if (typeof window.__applyRemoteRoomData === 'function') {
+                                suppressNextPush = true;
+                                window.__applyRemoteRoomData(remote.shopping, remote.todos);
+                                setTimeout(() => { suppressNextPush = false; }, 120);
+                            }
+                        }, (err) => {
+                            console.error('Live sync listener error:', err);
+                        });
+                    }
+
+                    window.__pushRoomDataToCloud = async function (shoppingList, todoList) {
+                        if (suppressNextPush) return;
+                        try {
+                            await setDoc(roomDocRef, {
+                                shopping: shoppingList,
+                                todos: todoList,
+                                updatedAt: Date.now()
+                            }, { merge: true });
+                        } catch (err) {
+                            console.error('Live sync push error:', err);
+                        }
+                    };
+
+                    window.addEventListener('hashchange', subscribeToRoom);
+                    subscribeToRoom();
+                } catch (err) {
+                    console.error('Live sync init error:', err);
+                }
+            })();
+        }
+    </script>
+
+    <!-- Self-Contained Local Storage App Logic -->
+    <script>
+        /**
+         * Reads or initializes a room code from the URL hash so each room
+         * can keep its own separate localStorage bucket.
+         */
+        function getRoomId() {
+            let hash = window.location.hash.replace('#', '').trim().toUpperCase();
+            if (!hash) {
+                hash = Math.random().toString(36).substring(2, 8).toUpperCase();
+                window.location.hash = hash;
+            }
+            return hash;
+        }
+
+        let currentRoomId = getRoomId();
+        let itemsData = [];
+        let todosData = [];
+        let activeTab = 'shopping';
+        let todoViewMode = 'upcoming'; // 'upcoming' | 'day'
+        let weekOffset = 0;
+        let selectedDateKey = getTodayDateKey();
+        let newTodoImportant = false;
+        let lastToggledId = null;
+
+        // DOM References
+        const listContainerEl = document.getElementById('list-container');
+        const todoContainerEl = document.getElementById('todo-container');
+        const shoppingInputBar = document.getElementById('shopping-input-bar');
+        const todoInputBar = document.getElementById('todo-input-bar');
+        const tabShoppingBtn = document.getElementById('tab-shopping-btn');
+        const tabTodoBtn = document.getElementById('tab-todo-btn');
+        const viewUpcomingBtn = document.getElementById('view-upcoming-btn');
+        const viewSelectedDayBtn = document.getElementById('view-selected-day-btn');
+        const shoppingListEl = document.getElementById('shopping-list');
+        const todoListEl = document.getElementById('todo-list');
+        const todoEmptyStateEl = document.getElementById('todo-empty-state');
+        const weekCalendarGridEl = document.getElementById('week-calendar-grid');
+        const weekRangeLabelEl = document.getElementById('week-range-label');
+        const selectedDayLabelEl = document.getElementById('selected-day-label');
+        const prevWeekBtn = document.getElementById('prev-week-btn');
+        const nextWeekBtn = document.getElementById('next-week-btn');
+        const todayJumpBtn = document.getElementById('today-jump-btn');
+        const addTodoForm = document.getElementById('add-todo-form');
+        const todoInput = document.getElementById('todo-input');
+        const newTodoImportantBtn = document.getElementById('new-todo-important-btn');
+        const loadingStateEl = document.getElementById('loading-state');
+        const emptyStateEl = document.getElementById('empty-state');
+        const itemCounterEl = document.getElementById('item-counter');
+        const checkedCountEl = document.getElementById('checked-count');
+        const clearCheckedBtn = document.getElementById('clear-checked-btn');
+        const addItemForm = document.getElementById('add-item-form');
+        const itemInput = document.getElementById('item-input');
+        const syncDot = document.getElementById('sync-dot');
+        const listCodeDisplay = document.getElementById('list-code-display');
+
+        // Modal Elements
+        const shareBtn = document.getElementById('share-btn');
+        const shareModal = document.getElementById('share-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const shareUrlText = document.getElementById('share-url-text');
+        const copyLinkBtn = document.getElementById('copy-link-btn');
+        const joinCodeForm = document.getElementById('join-code-form');
+        const joinCodeInput = document.getElementById('join-code-input');
+        const toastEl = document.getElementById('toast');
+
+        let toastTimeout = null;
+
+        /**
+         * Displays a brief toast notification at the top of the screen.
+         */
+        function showToast(msg) {
+            toastEl.textContent = msg;
+            toastEl.classList.remove('hidden');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastEl.classList.add('hidden');
+            }, 2400);
+        }
+
+        /**
+         * Escapes HTML characters before inserting user strings into markup.
+         */
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        /**
+         * Builds localStorage keys scoped to the current room code.
+         */
+        function getStorageKeys() {
+            return {
+                shopping: `our_list_shopping_${currentRoomId}`,
+                todos: `our_list_todos_${currentRoomId}`
+            };
+        }
+
+        /**
+         * Persists current shopping and to-do items safely to localStorage.
+         */
+        function saveToStorage() {
+            try {
+                const keys = getStorageKeys();
+                localStorage.setItem(keys.shopping, JSON.stringify(itemsData));
+                localStorage.setItem(keys.todos, JSON.stringify(todosData));
+                if (typeof window.__pushRoomDataToCloud === 'function') {
+                    window.__pushRoomDataToCloud(itemsData, todosData);
+                }
+            } catch (err) {
+                console.error('Failed to save to localStorage:', err);
+            }
+        }
+
+        /**
+         * Loads saved items from localStorage or starts with empty lists.
+         */
+        function loadFromStorage() {
+            try {
+                const keys = getStorageKeys();
+                const rawShopping = localStorage.getItem(keys.shopping);
+                const rawTodos = localStorage.getItem(keys.todos);
+
+                if (rawShopping !== null) {
+                    itemsData = JSON.parse(rawShopping);
+                } else {
+                    itemsData = [];
+                }
+
+                if (rawTodos !== null) {
+                    todosData = JSON.parse(rawTodos);
+                } else {
+                    todosData = [];
+                }
+
+                saveToStorage();
+            } catch (err) {
+                console.error('Failed to load from localStorage:', err);
+                itemsData = [];
+                todosData = [];
+            }
+        }
+
+        /**
+         * Formats a Date instance into a YYYY-MM-DD key in local time.
+         */
+        function formatDateKey(dateObj) {
+            const y = dateObj.getFullYear();
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dateObj.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        /**
+         * Parses a YYYY-MM-DD key back into a local Date instance at midnight.
+         */
+        function parseDateKeyToLocalDate(dateKey) {
+            const parts = String(dateKey || '').split('-').map(Number);
+            if (parts.length !== 3 || parts.some(Number.isNaN)) {
+                const now = new Date();
+                return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            }
+            return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+
+        function getTodayDateKey() {
+            return formatDateKey(new Date());
+        }
+
+        function formatDayHeading(dateKey, todayKey) {
+            const d = parseDateKeyToLocalDate(dateKey);
+            const fmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+            if (dateKey === todayKey) {
+                return `Today · ${fmt.format(d)}`;
+            }
+            const tomorrow = parseDateKeyToLocalDate(todayKey);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            if (dateKey === formatDateKey(tomorrow)) {
+                return `Tomorrow · ${fmt.format(d)}`;
+            }
+            return fmt.format(d);
+        }
+
+        /**
+         * Extracts date keywords (like "thurs 26th nov gutters" or "tomorrow bins")
+         * and returns the cleaned task description plus target dateKey.
+         */
+        function parseTaskWithDate(rawText, fallbackDateKey) {
+            const original = rawText.trim();
+            let working = original;
+            let matchedDate = null;
+
+            const now = new Date();
+            const baseMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            const monthMap = {
+                jan: 0, january: 0,
+                feb: 1, february: 1,
+                mar: 2, march: 2,
+                apr: 3, april: 3,
+                may: 4,
+                jun: 5, june: 5,
+                jul: 6, july: 6,
+                aug: 7, august: 7,
+                sep: 8, sept: 8, september: 8,
+                oct: 9, october: 9,
+                nov: 10, november: 10,
+                dec: 11, december: 11
+            };
+
+            const weekdayMap = {
+                sun: 0, sunday: 0,
+                mon: 1, monday: 1,
+                tue: 2, tues: 2, tuesday: 2,
+                wed: 3, weds: 3, wednesday: 3,
+                thu: 4, thur: 4, thurs: 4, thursday: 4,
+                fri: 5, friday: 5,
+                sat: 6, saturday: 6
+            };
+
+            const dayMonthRegex = /\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i;
+            const monthDayRegex = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i;
+
+            let monthIdx = null;
+            let dayNum = null;
+
+            const dmMatch = working.match(dayMonthRegex);
+            const mdMatch = working.match(monthDayRegex);
+
+            if (dmMatch) {
+                dayNum = parseInt(dmMatch[1], 10);
+                monthIdx = monthMap[dmMatch[2].toLowerCase()];
+                working = working.replace(dmMatch[0], ' ');
+            } else if (mdMatch) {
+                monthIdx = monthMap[mdMatch[1].toLowerCase()];
+                dayNum = parseInt(mdMatch[2], 10);
+                working = working.replace(mdMatch[0], ' ');
+            }
+
+            const weekdayRegex = /\b(sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:s|nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?)\b/i;
+            const wdMatch = working.match(weekdayRegex);
+            let targetWeekday = null;
+            if (wdMatch) {
+                targetWeekday = weekdayMap[wdMatch[1].toLowerCase()];
+                working = working.replace(wdMatch[0], ' ');
+            }
+
+            if (/\btoday\b/i.test(working)) {
+                matchedDate = new Date(baseMidnight);
+                working = working.replace(/\btoday\b/gi, ' ');
+            } else if (/\btomorrow\b/i.test(working)) {
+                matchedDate = new Date(baseMidnight);
+                matchedDate.setDate(baseMidnight.getDate() + 1);
+                working = working.replace(/\btomorrow\b/gi, ' ');
+            }
+
+            if (!matchedDate && (monthIdx !== null && dayNum !== null)) {
+                let year = baseMidnight.getFullYear();
+                let candidate = new Date(year, monthIdx, dayNum);
+                const diffDays = (candidate - baseMidnight) / (1000 * 60 * 60 * 24);
+                if (diffDays < -30) {
+                    candidate = new Date(year + 1, monthIdx, dayNum);
+                }
+                matchedDate = candidate;
+            } else if (!matchedDate && targetWeekday !== null) {
+                const currentDow = baseMidnight.getDay();
+                let delta = (targetWeekday - currentDow + 7) % 7;
+                if (delta === 0) delta = 7;
+                matchedDate = new Date(baseMidnight);
+                matchedDate.setDate(baseMidnight.getDate() + delta);
+            }
+
+            const cleanedTask = working.replace(/\s+/g, ' ').trim();
+            const finalDateKey = matchedDate ? formatDateKey(matchedDate) : fallbackDateKey;
+            const finalText = cleanedTask || original;
+
+            return {
+                text: finalText,
+                dateKey: finalDateKey,
+                detectedDate: matchedDate ? formatDateKey(matchedDate) : null
+            };
+        }
+
+        /**
+         * Returns Monday through Sunday day metadata for a given week offset.
+         */
+        function getMonToSunDays(offset) {
+            const now = new Date();
+            const localMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const mondayIndex = (localMidnight.getDay() + 6) % 7;
+            const mondayDate = new Date(localMidnight);
+            mondayDate.setDate(localMidnight.getDate() - mondayIndex + (offset * 7));
+
+            const dayNamesShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const dayNamesFull = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+            return dayNamesShort.map((shortName, idx) => {
+                const d = new Date(mondayDate);
+                d.setDate(mondayDate.getDate() + idx);
+                return {
+                    date: d,
+                    key: formatDateKey(d),
+                    shortName,
+                    fullName: dayNamesFull[idx],
+                    dayNum: d.getDate()
+                };
+            });
+        }
+
+        /**
+         * Updates weekOffset so the calendar strip displays the week containing dateKey.
+         */
+        function syncWeekOffsetToDateKey(dateKey) {
+            const targetDate = parseDateKeyToLocalDate(dateKey);
+            const now = new Date();
+            const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const todayMondayIndex = (todayMidnight.getDay() + 6) % 7;
+            const thisMonday = new Date(todayMidnight);
+            thisMonday.setDate(todayMidnight.getDate() - todayMondayIndex);
+
+            const targetMondayIndex = (targetDate.getDay() + 6) % 7;
+            const targetMonday = new Date(targetDate);
+            targetMonday.setDate(targetDate.getDate() - targetMondayIndex);
+
+            weekOffset = Math.round((targetMonday - thisMonday) / (7 * 24 * 60 * 60 * 1000));
+        }
+
+        function updatePlannerViewButtons() {
+            if (todoViewMode === 'upcoming') {
+                viewUpcomingBtn.className = 'py-1.5 px-2 rounded-xl text-[11px] font-extrabold border-2 border-[#292524] bg-[#0f766e] text-white shadow-[1.5px_1.5px_0px_#292524] transition-all';
+                viewSelectedDayBtn.className = 'py-1.5 px-2 rounded-xl text-[11px] font-extrabold border-2 border-[#292524] bg-[#fffef5] text-[#1c1917] hover:bg-[#fef3c7] shadow-[1.5px_1.5px_0px_#292524] transition-all';
+            } else {
+                viewSelectedDayBtn.className = 'py-1.5 px-2 rounded-xl text-[11px] font-extrabold border-2 border-[#292524] bg-[#2563eb] text-white shadow-[1.5px_1.5px_0px_#292524] transition-all';
+                viewUpcomingBtn.className = 'py-1.5 px-2 rounded-xl text-[11px] font-extrabold border-2 border-[#292524] bg-[#fffef5] text-[#1c1917] hover:bg-[#fef3c7] shadow-[1.5px_1.5px_0px_#292524] transition-all';
+            }
+        }
+
+        /**
+         * Switches between the Shopping List tab and To-Do List tab.
+         */
+        function setActiveTab(tabName) {
+            activeTab = tabName;
+            const isShopping = tabName === 'shopping';
+
+            tabShoppingBtn.setAttribute('aria-selected', String(isShopping));
+            tabTodoBtn.setAttribute('aria-selected', String(!isShopping));
+
+            if (isShopping) {
+                tabShoppingBtn.className = 'py-2 px-3 rounded-xl text-xs font-extrabold border-2 border-[#292524] bg-[#2563eb] text-white shadow-[2px_2px_0px_#292524] transition-all flex items-center justify-center gap-1.5';
+                tabTodoBtn.className = 'py-2 px-3 rounded-xl text-xs font-extrabold border-2 border-[#292524] bg-[#fffef5] text-[#1c1917] hover:bg-[#fef3c7] shadow-[2px_2px_0px_#292524] transition-all flex items-center justify-center gap-1.5';
+                listContainerEl.classList.remove('hidden');
+                todoContainerEl.classList.add('hidden');
+                shoppingInputBar.classList.remove('hidden');
+                todoInputBar.classList.add('hidden');
+                renderList();
+            } else {
+                tabTodoBtn.className = 'py-2 px-3 rounded-xl text-xs font-extrabold border-2 border-[#292524] bg-[#2563eb] text-white shadow-[2px_2px_0px_#292524] transition-all flex items-center justify-center gap-1.5';
+                tabShoppingBtn.className = 'py-2 px-3 rounded-xl text-xs font-extrabold border-2 border-[#292524] bg-[#fffef5] text-[#1c1917] hover:bg-[#fef3c7] shadow-[2px_2px_0px_#292524] transition-all flex items-center justify-center gap-1.5';
+                listContainerEl.classList.add('hidden');
+                todoContainerEl.classList.remove('hidden');
+                shoppingInputBar.classList.add('hidden');
+                todoInputBar.classList.remove('hidden');
+                renderTodoTab();
+            }
+        }
+
+        /**
+         * Builds a single interactive to-do card element.
+         */
+        function buildTaskCard(task) {
+            const isJustToggled = task.id === lastToggledId;
+            const card = document.createElement('div');
+            card.dataset.id = task.id;
+            card.className = `group flex items-center justify-between px-3.5 py-3 rounded-2xl transition-all duration-200 select-none cursor-pointer ${
+                task.checked
+                    ? 'tactile-card-checked item-checked'
+                    : task.important
+                        ? 'important-card'
+                        : 'tactile-card hover:bg-white'
+            }`;
+
+            card.addEventListener('click', () => toggleTodoItem(task.id, !task.checked));
+
+            card.innerHTML = `
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="w-6 h-6 rounded-lg border-[2.5px] flex items-center justify-center shrink-0 transition-colors duration-200 ${
+                        task.checked
+                            ? `bg-[#15803d] border-[#14532d] text-white ${isJustToggled ? 'check-pop' : ''}`
+                            : 'border-[#292524] bg-white group-hover:border-[#2563eb]'
+                    }">
+                        ${task.checked ? `
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        ` : ''}
+                    </div>
+
+                    <div class="min-w-0 flex-1 flex items-center gap-2">
+                        <span class="text-base font-bold leading-snug truncate pen-strike-wrap transition-colors duration-200 ${
+                            task.checked ? 'text-[#78716c]' : 'text-[#1c1917]'
+                        }">
+                            ${escapeHtml(task.text)}
+                            <span class="pen-strike-line" aria-hidden="true"></span>
+                        </span>
+                        ${task.important ? `
+                            <span class="shrink-0 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-[#dc2626] text-white border border-[#292524]">
+                                Important
+                            </span>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1.5 ml-2 shrink-0">
+                    <button
+                        type="button"
+                        aria-label="Toggle important highlight"
+                        class="star-btn w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-colors ${
+                            task.important
+                                ? 'bg-[#dc2626] border-[#292524] text-white'
+                                : 'bg-white border-[#78716c] text-[#78716c] hover:text-[#dc2626] hover:border-[#dc2626]'
+                        }"
+                    >
+                        <svg class="w-4 h-4" fill="${task.important ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                        </svg>
+                    </button>
+
+                    <button
+                        type="button"
+                        aria-label="Delete task"
+                        class="delete-todo-btn w-8 h-8 rounded-xl border-2 border-[#78716c] bg-white text-[#44403c] hover:bg-[#fee2e2] hover:border-[#b91c1c] hover:text-[#b91c1c] active:scale-95 flex items-center justify-center transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+
+            card.querySelector('.star-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleTodoImportant(task.id, !task.important);
+            });
+
+            card.querySelector('.delete-todo-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteTodoItem(task.id);
+            });
+
+            return card;
+        }
+
+        /**
+         * Renders the Mon-Sun calendar strip and upcoming/selected-day tasks.
+         */
+        function renderTodoTab() {
+            updatePlannerViewButtons();
+
+            const days = getMonToSunDays(weekOffset);
+            const selectedDayObj = days.find((d) => d.key === selectedDateKey) || days[0];
+            selectedDateKey = selectedDayObj.key;
+
+            const firstDay = days[0].date;
+            const lastDay = days[6].date;
+            const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+            weekRangeLabelEl.textContent = `${monthFormatter.format(firstDay)} – ${monthFormatter.format(lastDay)}`;
+
+            const dayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+            selectedDayLabelEl.textContent = dayFormatter.format(selectedDayObj.date);
+
+            const todayKey = getTodayDateKey();
+            weekCalendarGridEl.innerHTML = '';
+
+            days.forEach((day) => {
+                const dayTasks = todosData.filter((t) => t.dateKey === day.key);
+                const openTasksCount = dayTasks.filter((t) => !t.checked).length;
+                const hasImportant = dayTasks.some((t) => t.important && !t.checked);
+                const isSelected = day.key === selectedDateKey;
+                const isToday = day.key === todayKey;
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `relative flex flex-col items-center py-1.5 px-1 rounded-xl border-2 transition-all ${
+                    isSelected
+                        ? 'bg-[#2563eb] text-white border-[#292524] shadow-[2px_2px_0px_#292524]'
+                        : isToday
+                            ? 'bg-[#e0f2fe] text-[#1c1917] border-[#2563eb]'
+                            : 'bg-white text-[#1c1917] border-[#d6d3d1] hover:bg-[#fef3c7]'
+                }`;
+
+                btn.innerHTML = `
+                    <span class="text-[10px] font-extrabold uppercase tracking-tight">${day.shortName}</span>
+                    <span class="text-sm font-extrabold leading-tight">${day.dayNum}</span>
+                    <div class="h-2 flex items-center justify-center gap-0.5 mt-0.5">
+                        ${hasImportant ? `<span class="w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-[#fde047]' : 'bg-[#dc2626]'}"></span>` : ''}
+                        ${openTasksCount > 0 ? `<span class="w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[#0f766e]'}"></span>` : ''}
+                    </div>
+                `;
+
+                btn.addEventListener('click', () => {
+                    selectedDateKey = day.key;
+                    renderTodoTab();
+                });
+
+                weekCalendarGridEl.appendChild(btn);
+            });
+
+            todoListEl.innerHTML = '';
+
+            if (todoViewMode === 'upcoming') {
+                const sortedAll = [...todosData].sort((a, b) => {
+                    if (a.dateKey !== b.dateKey) return a.dateKey.localeCompare(b.dateKey);
+                    if (a.important !== b.important) return a.important ? -1 : 1;
+                    return (a.createdAt || 0) - (b.createdAt || 0);
+                });
+
+                const checkedAll = sortedAll.filter((t) => t.checked);
+                if (activeTab === 'todo') {
+                    if (checkedAll.length > 0) {
+                        checkedCountEl.textContent = checkedAll.length;
+                        clearCheckedBtn.classList.remove('hidden');
+                        clearCheckedBtn.classList.add('flex');
+                    } else {
+                        clearCheckedBtn.classList.add('hidden');
+                        clearCheckedBtn.classList.remove('flex');
+                    }
+                }
+
+                if (sortedAll.length === 0) {
+                    todoEmptyStateEl.classList.remove('hidden');
+                    todoEmptyStateEl.classList.add('flex');
+                    return;
+                }
+
+                todoEmptyStateEl.classList.add('hidden');
+                todoEmptyStateEl.classList.remove('flex');
+
+                const groupedMap = new Map();
+                sortedAll.forEach((task) => {
+                    const key = task.dateKey || todayKey;
+                    if (!groupedMap.has(key)) groupedMap.set(key, []);
+                    groupedMap.get(key).push(task);
+                });
+
+                groupedMap.forEach((tasksForDay, dateKey) => {
+                    const groupWrap = document.createElement('div');
+                    groupWrap.className = 'space-y-2';
+
+                    const headingRow = document.createElement('button');
+                    headingRow.type = 'button';
+                    headingRow.className = 'w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#fef08a] border-2 border-[#292524] shadow-[2px_2px_0px_#292524] text-left hover:bg-[#fde047] transition-colors';
+                    headingRow.innerHTML = `
+                        <span class="text-xs font-extrabold uppercase tracking-wide text-[#1c1917]">${escapeHtml(formatDayHeading(dateKey, todayKey))}</span>
+                        <span class="text-[11px] font-bold text-[#2563eb]">${tasksForDay.length} ${tasksForDay.length === 1 ? 'task' : 'tasks'}</span>
+                    `;
+                    headingRow.addEventListener('click', () => {
+                        selectedDateKey = dateKey;
+                        syncWeekOffsetToDateKey(dateKey);
+                        renderTodoTab();
+                    });
+
+                    groupWrap.appendChild(headingRow);
+
+                    const stack = document.createElement('div');
+                    stack.className = 'space-y-2.5';
+                    tasksForDay.forEach((task) => {
+                        stack.appendChild(buildTaskCard(task));
+                    });
+                    groupWrap.appendChild(stack);
+
+                    todoListEl.appendChild(groupWrap);
+                });
+            } else {
+                const dayTodos = todosData
+                    .filter((t) => t.dateKey === selectedDateKey)
+                    .sort((a, b) => {
+                        if (a.important !== b.important) return a.important ? -1 : 1;
+                        return (a.createdAt || 0) - (b.createdAt || 0);
+                    });
+
+                const checkedDayTodos = dayTodos.filter((t) => t.checked);
+                if (activeTab === 'todo') {
+                    if (checkedDayTodos.length > 0) {
+                        checkedCountEl.textContent = checkedDayTodos.length;
+                        clearCheckedBtn.classList.remove('hidden');
+                        clearCheckedBtn.classList.add('flex');
+                    } else {
+                        clearCheckedBtn.classList.add('hidden');
+                        clearCheckedBtn.classList.remove('flex');
+                    }
+                }
+
+                if (dayTodos.length === 0) {
+                    todoEmptyStateEl.classList.remove('hidden');
+                    todoEmptyStateEl.classList.add('flex');
+                    return;
+                }
+
+                todoEmptyStateEl.classList.add('hidden');
+                todoEmptyStateEl.classList.remove('flex');
+
+                dayTodos.forEach((task) => {
+                    todoListEl.appendChild(buildTaskCard(task));
+                });
+            }
+
+            lastToggledId = null;
+        }
+
+        /**
+         * Scrolls the shopping list smoothly so the newest item and recent context remain visible.
+         */
+        function scrollToRecentItems(targetId) {
+            requestAnimationFrame(() => {
+                if (!listContainerEl || !shoppingListEl) return;
+
+                const rows = Array.from(shoppingListEl.querySelectorAll('li'));
+                if (rows.length === 0) return;
+
+                const targetIndex = targetId
+                    ? rows.findIndex((row) => row.dataset.id === targetId)
+                    : rows.length - 1;
+
+                if (targetIndex === -1) return;
+
+                const anchorIndex = Math.max(0, targetIndex - 2);
+                const anchorRow = rows[anchorIndex];
+                if (!anchorRow) return;
+
+                const desiredTop = Math.max(0, anchorRow.offsetTop - 16);
+                listContainerEl.scrollTo({
+                    top: desiredTop,
+                    behavior: 'smooth'
+                });
+            });
+        }
+
+        /**
+         * Renders shopping items in added order while preserving checked rows in place.
+         */
+        function renderList() {
+            loadingStateEl.classList.add('hidden');
+
+            const orderedItems = [...itemsData].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+            const uncheckedCount = orderedItems.filter(i => !i.checked).length;
+            const checkedCount = orderedItems.filter(i => i.checked).length;
+
+            if (orderedItems.length === 0) {
+                itemCounterEl.textContent = 'All caught up!';
+                emptyStateEl.classList.remove('hidden');
+                emptyStateEl.classList.add('flex');
+            } else {
+                emptyStateEl.classList.add('hidden');
+                emptyStateEl.classList.remove('flex');
+                itemCounterEl.textContent = uncheckedCount === 0
+                    ? 'Everything crossed off!'
+                    : `${uncheckedCount} left to grab`;
+            }
+
+            if (activeTab === 'shopping') {
+                if (checkedCount > 0) {
+                    checkedCountEl.textContent = checkedCount;
+                    clearCheckedBtn.classList.remove('hidden');
+                    clearCheckedBtn.classList.add('flex');
+                } else {
+                    clearCheckedBtn.classList.add('hidden');
+                    clearCheckedBtn.classList.remove('flex');
+                }
+            }
+
+            shoppingListEl.innerHTML = '';
+            orderedItems.forEach(item => {
+                const isJustToggled = item.id === lastToggledId;
+                const li = document.createElement('li');
+                li.dataset.id = item.id;
+
+                li.className = `group flex items-center justify-between px-3.5 py-3 rounded-2xl transition-all duration-200 select-none cursor-pointer ${
+                    item.checked
+                        ? 'tactile-card-checked item-checked'
+                        : 'tactile-card hover:bg-white'
+                }`;
+
+                li.addEventListener('click', () => toggleItem(item.id, !item.checked));
+
+                li.innerHTML = `
+                    <div class="flex items-center gap-3.5 flex-1 min-w-0">
+                        <div class="checkbox-box w-6 h-6 rounded-lg border-[2.5px] flex items-center justify-center shrink-0 transition-colors duration-200 ${
+                            item.checked
+                                ? `bg-[#15803d] border-[#14532d] text-white ${isJustToggled ? 'check-pop' : ''}`
+                                : 'border-[#292524] bg-white group-hover:border-[#2563eb]'
+                        }">
+                            ${item.checked ? `
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3.5" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            ` : ''}
+                        </div>
+
+                        <span class="text-base font-bold leading-snug truncate pen-strike-wrap transition-colors duration-200 ${
+                            item.checked ? 'text-[#78716c]' : 'text-[#1c1917]'
+                        }">
+                            ${escapeHtml(item.text)}
+                            <span class="pen-strike-line" aria-hidden="true"></span>
+                        </span>
+                    </div>
+
+                    <button
+                        type="button"
+                        aria-label="Delete item"
+                        class="delete-btn ml-2 w-8 h-8 rounded-xl border-2 border-[#78716c] bg-white text-[#44403c] hover:bg-[#fee2e2] hover:border-[#b91c1c] hover:text-[#b91c1c] active:scale-95 flex items-center justify-center transition-colors shrink-0"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                `;
+
+                const delBtn = li.querySelector('.delete-btn');
+                delBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteItem(item.id);
+                });
+
+                shoppingListEl.appendChild(li);
+            });
+
+            lastToggledId = null;
+        }
+
+        /**
+         * Adds a to-do task with automatic date detection.
+         */
+        function addTodoItem(rawText, isImportant) {
+            const parsed = parseTaskWithDate(rawText, selectedDateKey);
+            if (!parsed.text) return;
+
+            selectedDateKey = parsed.dateKey;
+            syncWeekOffsetToDateKey(parsed.dateKey);
+
+            if (parsed.detectedDate) {
+                const prettyDate = formatDayHeading(parsed.dateKey, getTodayDateKey());
+                showToast(`Added to ${prettyDate}`);
+            }
+
+            todosData.push({
+                id: 'todo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                text: parsed.text,
+                dateKey: parsed.dateKey,
+                checked: false,
+                important: Boolean(isImportant),
+                createdAt: Date.now()
+            });
+
+            saveToStorage();
+            renderTodoTab();
+        }
+
+        function toggleTodoItem(id, newCheckedState) {
+            lastToggledId = id;
+            const target = todosData.find((t) => t.id === id);
+            if (target) target.checked = newCheckedState;
+            saveToStorage();
+            renderTodoTab();
+        }
+
+        function toggleTodoImportant(id, newImportantState) {
+            const target = todosData.find((t) => t.id === id);
+            if (target) target.important = newImportantState;
+            saveToStorage();
+            renderTodoTab();
+        }
+
+        function deleteTodoItem(id) {
+            todosData = todosData.filter((t) => t.id !== id);
+            saveToStorage();
+            renderTodoTab();
+        }
+
+        function deleteItem(id) {
+            itemsData = itemsData.filter((i) => i.id !== id);
+            saveToStorage();
+            renderList();
+        }
+
+        function addItem(text) {
+            const cleanText = text.trim();
+            if (!cleanText) return;
+
+            const newItem = {
+                id: 'item-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                text: cleanText,
+                checked: false,
+                createdAt: Date.now()
+            };
+            itemsData.push(newItem);
+            saveToStorage();
+            renderList();
+            scrollToRecentItems(newItem.id);
+        }
+
+        function toggleItem(id, newCheckedState) {
+            lastToggledId = id;
+
+            const targetItem = itemsData.find(i => i.id === id);
+            if (targetItem) {
+                targetItem.checked = newCheckedState;
+            }
+            saveToStorage();
+
+            const rowEl = shoppingListEl.querySelector(`li[data-id="${id}"]`);
+            if (rowEl) {
+                const boxEl = rowEl.querySelector('.checkbox-box');
+                const textEl = rowEl.querySelector('.pen-strike-wrap');
+
+                if (newCheckedState) {
+                    rowEl.className = 'group flex items-center justify-between px-3.5 py-3 rounded-2xl transition-all duration-200 select-none cursor-pointer tactile-card-checked item-checked';
+                    boxEl.className = 'checkbox-box w-6 h-6 rounded-lg border-[2.5px] flex items-center justify-center shrink-0 transition-colors duration-200 bg-[#15803d] border-[#14532d] text-white check-pop';
+                    boxEl.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>`;
+                    textEl.classList.remove('text-[#1c1917]');
+                    textEl.classList.add('text-[#78716c]');
+                } else {
+                    rowEl.className = 'group flex items-center justify-between px-3.5 py-3 rounded-2xl transition-all duration-200 select-none cursor-pointer tactile-card hover:bg-white';
+                    boxEl.className = 'checkbox-box w-6 h-6 rounded-lg border-[2.5px] flex items-center justify-center shrink-0 transition-colors duration-200 border-[#292524] bg-white group-hover:border-[#2563eb]';
+                    boxEl.innerHTML = '';
+                    textEl.classList.remove('text-[#78716c]');
+                    textEl.classList.add('text-[#1c1917]');
+                }
+
+                const uncheckedCount = itemsData.filter(i => !i.checked).length;
+                const checkedCount = itemsData.filter(i => i.checked).length;
+                itemCounterEl.textContent = uncheckedCount === 0
+                    ? 'Everything crossed off!'
+                    : `${uncheckedCount} left to grab`;
+
+                if (checkedCount > 0) {
+                    checkedCountEl.textContent = checkedCount;
+                    clearCheckedBtn.classList.remove('hidden');
+                    clearCheckedBtn.classList.add('flex');
+                } else {
+                    clearCheckedBtn.classList.add('hidden');
+                    clearCheckedBtn.classList.remove('flex');
+                }
+            }
+        }
+
+        function clearAllChecked() {
+            if (activeTab === 'todo') {
+                const checkedTodos = todoViewMode === 'upcoming'
+                    ? todosData.filter((t) => t.checked)
+                    : todosData.filter((t) => t.dateKey === selectedDateKey && t.checked);
+                if (checkedTodos.length === 0) return;
+
+                const idsToRemove = new Set(checkedTodos.map((t) => t.id));
+                todosData = todosData.filter((t) => !idsToRemove.has(t.id));
+                saveToStorage();
+                renderTodoTab();
+                showToast(`Cleared ${checkedTodos.length} tasks`);
+                return;
+            }
+
+            const checkedItems = itemsData.filter(item => item.checked);
+            if (checkedItems.length === 0) return;
+
+            itemsData = itemsData.filter(item => !item.checked);
+            saveToStorage();
+            renderList();
+            showToast(`Cleared ${checkedItems.length} items`);
+        }
+
+        // Event Listeners
+        tabShoppingBtn.addEventListener('click', () => setActiveTab('shopping'));
+        tabTodoBtn.addEventListener('click', () => setActiveTab('todo'));
+
+        viewUpcomingBtn.addEventListener('click', () => {
+            todoViewMode = 'upcoming';
+            renderTodoTab();
+        });
+
+        viewSelectedDayBtn.addEventListener('click', () => {
+            todoViewMode = 'day';
+            renderTodoTab();
+        });
+
+        prevWeekBtn.addEventListener('click', () => {
+            weekOffset -= 1;
+            const days = getMonToSunDays(weekOffset);
+            selectedDateKey = days[0].key;
+            renderTodoTab();
+        });
+
+        nextWeekBtn.addEventListener('click', () => {
+            weekOffset += 1;
+            const days = getMonToSunDays(weekOffset);
+            selectedDateKey = days[0].key;
+            renderTodoTab();
+        });
+
+        todayJumpBtn.addEventListener('click', () => {
+            weekOffset = 0;
+            selectedDateKey = getTodayDateKey();
+            renderTodoTab();
+        });
+
+        newTodoImportantBtn.addEventListener('click', () => {
+            newTodoImportant = !newTodoImportant;
+            newTodoImportantBtn.setAttribute('aria-pressed', String(newTodoImportant));
+            if (newTodoImportant) {
+                newTodoImportantBtn.className = 'rounded-2xl p-3 border-2 border-[#292524] bg-[#dc2626] text-white shadow-[2px_2px_0px_#292524] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all shrink-0';
+            } else {
+                newTodoImportantBtn.className = 'rounded-2xl p-3 border-2 border-[#292524] bg-[#fffef5] text-[#78716c] shadow-[2px_2px_0px_#292524] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all shrink-0';
+            }
+        });
+
+        addTodoForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const val = todoInput.value;
+            if (val.trim()) {
+                addTodoItem(val, newTodoImportant);
+                todoInput.value = '';
+                newTodoImportant = false;
+                newTodoImportantBtn.setAttribute('aria-pressed', 'false');
+                newTodoImportantBtn.className = 'rounded-2xl p-3 border-2 border-[#292524] bg-[#fffef5] text-[#78716c] shadow-[2px_2px_0px_#292524] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all shrink-0';
+                todoInput.focus();
+            }
+        });
+
+        // Keep cursor locked inside the shopping input box after pressing Enter
+        addItemForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const val = itemInput.value;
+            if (val.trim()) {
+                addItem(val);
+                itemInput.value = '';
+                itemInput.focus();
+            }
+        });
+
+        clearCheckedBtn.addEventListener('click', clearAllChecked);
+
+        // Modal Interactions
+        shareBtn.addEventListener('click', () => {
+            shareUrlText.textContent = window.location.href;
+            shareModal.classList.remove('hidden');
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            shareModal.classList.add('hidden');
+        });
+
+        shareModal.addEventListener('click', (e) => {
+            if (e.target === shareModal) shareModal.classList.add('hidden');
+        });
+
+        copyLinkBtn.addEventListener('click', () => {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(window.location.href).catch(() => {});
+                }
+                const tempInput = document.createElement('input');
+                tempInput.value = window.location.href;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                showToast('Link copied!');
+            } catch (err) {
+                console.error('Copy failed:', err);
+                showToast('Could not copy link');
+            }
+        });
+
+        joinCodeForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newCode = joinCodeInput.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+            if (newCode) {
+                window.location.hash = newCode;
+                currentRoomId = newCode;
+                joinCodeInput.value = '';
+                shareModal.classList.add('hidden');
+                initRoom();
+                showToast(`Switched to room: ${newCode}`);
+            }
+        });
+
+        window.addEventListener('hashchange', () => {
+            currentRoomId = getRoomId();
+            initRoom();
+        });
+
+        function initRoom() {
+            listCodeDisplay.textContent = `Code: ${currentRoomId}`;
+            shareUrlText.textContent = window.location.href;
+            syncDot.classList.remove('bg-amber-500');
+            syncDot.classList.add('bg-[#16a34a]');
+            loadFromStorage();
+            renderList();
+            renderTodoTab();
+        }
+
+        window.__applyRemoteRoomData = function (remoteShopping, remoteTodos) {
+            itemsData = remoteShopping;
+            todosData = remoteTodos;
+            try {
+                const keys = getStorageKeys();
+                localStorage.setItem(keys.shopping, JSON.stringify(itemsData));
+                localStorage.setItem(keys.todos, JSON.stringify(todosData));
+            } catch (err) {
+                console.error('Failed to cache remote data:', err);
+            }
+            if (activeTab === 'shopping') {
+                renderList();
+            } else {
+                renderTodoTab();
+            }
+        };
+
+        // Initialize app on load
+        initRoom();
+    </script>
+</body>
+</html>
