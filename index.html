@@ -49,8 +49,10 @@
         /* Left-to-right drawn red-ink pen strikethrough */
         .pen-strike-wrap {
             position: relative;
-            display: inline-block;
-            padding: 0 3px;
+            display: inline;
+            padding: 0 2px;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
         }
 
         .pen-strike-line {
@@ -319,6 +321,67 @@
             </form>
         </div>
 
+        <!-- Edit Task Modal -->
+        <div id="edit-todo-modal" class="hidden fixed inset-0 bg-[#1c1917]/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div class="bg-[#fffef5] border-2 border-[#292524] shadow-[5px_5px_0px_#292524] rounded-3xl max-w-sm w-full p-5">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-extrabold text-[#1c1917]">Edit Task</h2>
+                    <button type="button" id="close-edit-todo-btn" aria-label="Close edit task" class="p-2 text-[#1c1917] hover:bg-[#fef08a] rounded-xl border-2 border-[#292524] bg-[#fffef5] shadow-[2px_2px_0px_#292524] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <form id="edit-todo-form" class="space-y-3.5">
+                    <div>
+                        <label for="edit-todo-text" class="block text-xs font-extrabold text-[#44403c] uppercase tracking-wider mb-1">Task details</label>
+                        <textarea
+                            id="edit-todo-text"
+                            rows="3"
+                            required
+                            class="w-full bg-white text-[#1c1917] border-2 border-[#292524] rounded-2xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+                        ></textarea>
+                    </div>
+
+                    <div>
+                        <label for="edit-todo-date" class="block text-xs font-extrabold text-[#44403c] uppercase tracking-wider mb-1">Date</label>
+                        <input
+                            type="date"
+                            id="edit-todo-date"
+                            required
+                            class="w-full bg-white text-[#1c1917] border-2 border-[#292524] rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+                        >
+                    </div>
+
+                    <label class="flex items-center gap-2.5 cursor-pointer select-none pt-0.5">
+                        <input
+                            type="checkbox"
+                            id="edit-todo-important"
+                            class="w-4 h-4 rounded border-2 border-[#292524] text-[#dc2626] focus:ring-[#dc2626]"
+                        >
+                        <span class="text-xs font-extrabold text-[#1c1917]">Highlight as Important</span>
+                    </label>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            id="cancel-edit-todo-btn"
+                            class="px-4 py-2 rounded-xl text-xs font-extrabold border-2 border-[#292524] bg-[#fffef5] hover:bg-[#fef3c7] text-[#1c1917] shadow-[2px_2px_0px_#292524] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="px-4 py-2 rounded-xl text-xs font-extrabold border-2 border-[#292524] bg-[#2563eb] hover:bg-[#1d4ed8] text-white shadow-[2px_2px_0px_#292524] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+                        >
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Room Code / Link Modal -->
         <div id="share-modal" class="hidden fixed inset-0 bg-[#1c1917]/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <div class="bg-[#fffef5] border-2 border-[#292524] shadow-[5px_5px_0px_#292524] rounded-3xl max-w-sm w-full p-6 transform transition-all">
@@ -385,16 +448,30 @@
                         window.__setLiveSyncStatus('connecting');
                     }
 
-                    await signInAnonymously(auth);
-                    await new Promise((resolve) => {
-                        if (auth.currentUser) return resolve();
-                        const stop = onAuthStateChanged(auth, (u) => {
-                            if (u) {
-                                stop();
-                                resolve();
-                            }
+                    // Attempt anonymous sign-in; if Anonymous auth is disabled or blocked in this environment,
+                    // fall back cleanly to local storage mode instead of throwing an uncaught error.
+                    try {
+                        await signInAnonymously(auth);
+                        await new Promise((resolve) => {
+                            if (auth.currentUser) return resolve();
+                            const stop = onAuthStateChanged(auth, (u) => {
+                                if (u) {
+                                    stop();
+                                    resolve();
+                                }
+                            });
                         });
-                    });
+                    } catch (authErr) {
+                        const code = authErr && authErr.code ? authErr.code : '';
+                        if (code === 'auth/permission-denied-on-the-service.' || code === 'auth/operation-not-allowed') {
+                            console.warn('Anonymous auth not enabled for this origin; using local storage mode.');
+                            if (typeof window.__setLiveSyncStatus === 'function') {
+                                window.__setLiveSyncStatus('local');
+                            }
+                            return;
+                        }
+                        throw authErr;
+                    }
 
                     let suppressNextPush = false;
 
@@ -491,6 +568,8 @@
         let selectedDateKey = getTodayDateKey();
         let newTodoImportant = false;
         let lastToggledId = null;
+        let editingTodoId = null;
+        const expandedTodoIds = new Set();
 
         // DOM References
         const listContainerEl = document.getElementById('list-container');
@@ -522,6 +601,15 @@
         const itemInput = document.getElementById('item-input');
         const syncDot = document.getElementById('sync-dot');
         const listCodeDisplay = document.getElementById('list-code-display');
+
+        // Edit Task Modal Elements
+        const editTodoModal = document.getElementById('edit-todo-modal');
+        const closeEditTodoBtn = document.getElementById('close-edit-todo-btn');
+        const cancelEditTodoBtn = document.getElementById('cancel-edit-todo-btn');
+        const editTodoForm = document.getElementById('edit-todo-form');
+        const editTodoTextInput = document.getElementById('edit-todo-text');
+        const editTodoDateInput = document.getElementById('edit-todo-date');
+        const editTodoImportantInput = document.getElementById('edit-todo-important');
 
         // Modal Elements
         const shareBtn = document.getElementById('share-btn');
@@ -835,13 +923,37 @@
         }
 
         /**
-         * Builds a single interactive to-do card element.
+         * Opens the Edit Task modal pre-filled with the task's current details.
+         */
+        function openEditTodoModal(taskId) {
+            const target = todosData.find((t) => t.id === taskId);
+            if (!target) return;
+
+            editingTodoId = taskId;
+            editTodoTextInput.value = target.text || '';
+            editTodoDateInput.value = target.dateKey || getTodayDateKey();
+            editTodoImportantInput.checked = Boolean(target.important);
+            editTodoModal.classList.remove('hidden');
+            setTimeout(() => editTodoTextInput.focus(), 40);
+        }
+
+        function closeEditTodoModal() {
+            editingTodoId = null;
+            editTodoModal.classList.add('hidden');
+        }
+
+        /**
+         * Builds a single interactive to-do card element with full text wrapping,
+         * tap-to-expand toggle for long notes, and an Edit button.
          */
         function buildTaskCard(task) {
             const isJustToggled = task.id === lastToggledId;
+            const isExpanded = expandedTodoIds.has(task.id);
+            const isLongText = String(task.text || '').length > 48;
+
             const card = document.createElement('div');
             card.dataset.id = task.id;
-            card.className = `group flex items-center justify-between px-3.5 py-3 rounded-2xl transition-all duration-200 select-none cursor-pointer ${
+            card.className = `group flex items-start justify-between gap-2 px-3.5 py-3 rounded-2xl transition-all duration-200 select-none ${
                 task.checked
                     ? 'tactile-card-checked item-checked'
                     : task.important
@@ -849,41 +961,64 @@
                         : 'tactile-card hover:bg-white'
             }`;
 
-            card.addEventListener('click', () => toggleTodoItem(task.id, !task.checked));
-
             card.innerHTML = `
-                <div class="flex items-center gap-3 flex-1 min-w-0">
-                    <div class="w-6 h-6 rounded-lg border-[2.5px] flex items-center justify-center shrink-0 transition-colors duration-200 ${
-                        task.checked
-                            ? `bg-[#15803d] border-[#14532d] text-white ${isJustToggled ? 'check-pop' : ''}`
-                            : 'border-[#292524] bg-white group-hover:border-[#2563eb]'
-                    }">
+                <div class="flex items-start gap-3 flex-1 min-w-0">
+                    <button
+                        type="button"
+                        aria-label="${task.checked ? 'Mark task incomplete' : 'Mark task complete'}"
+                        class="check-toggle-btn mt-0.5 w-6 h-6 rounded-lg border-[2.5px] flex items-center justify-center shrink-0 transition-colors duration-200 cursor-pointer ${
+                            task.checked
+                                ? `bg-[#15803d] border-[#14532d] text-white ${isJustToggled ? 'check-pop' : ''}`
+                                : 'border-[#292524] bg-white hover:border-[#2563eb]'
+                        }"
+                    >
                         ${task.checked ? `
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3.5" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
                             </svg>
                         ` : ''}
-                    </div>
+                    </button>
 
-                    <div class="min-w-0 flex-1 flex items-center gap-2">
-                        <span class="text-base font-bold leading-snug truncate pen-strike-wrap transition-colors duration-200 ${
-                            task.checked ? 'text-[#78716c]' : 'text-[#1c1917]'
+                    <div class="task-text-area min-w-0 flex-1 cursor-pointer">
+                        <div class="text-[15px] font-bold leading-snug break-words whitespace-pre-line ${
+                            isExpanded ? '' : 'line-clamp-2'
                         }">
-                            ${escapeHtml(task.text)}
-                            <span class="pen-strike-line" aria-hidden="true"></span>
-                        </span>
-                        ${task.important ? `
-                            <span class="shrink-0 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-[#dc2626] text-white border border-[#292524]">
-                                Important
-                            </span>
-                        ` : ''}
+                            <span class="pen-strike-wrap transition-colors duration-200 ${
+                                task.checked ? 'text-[#78716c]' : 'text-[#1c1917]'
+                            }">${escapeHtml(task.text)}<span class="pen-strike-line" aria-hidden="true"></span></span>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            ${task.important ? `
+                                <span class="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-[#dc2626] text-white border border-[#292524]">
+                                    Important
+                                </span>
+                            ` : ''}
+                            ${isLongText ? `
+                                <span class="text-[11px] font-extrabold text-[#2563eb]">
+                                    ${isExpanded ? 'Show less' : 'Tap to read more'}
+                                </span>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-1.5 ml-2 shrink-0">
+                <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
+                    <button
+                        type="button"
+                        aria-label="Edit task"
+                        title="Edit task"
+                        class="edit-todo-btn w-8 h-8 rounded-xl border-2 border-[#78716c] bg-white text-[#1c1917] hover:bg-[#fef08a] hover:border-[#292524] active:scale-95 flex items-center justify-center transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                    </button>
+
                     <button
                         type="button"
                         aria-label="Toggle important highlight"
+                        title="Toggle important"
                         class="star-btn w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-colors ${
                             task.important
                                 ? 'bg-[#dc2626] border-[#292524] text-white'
@@ -898,6 +1033,7 @@
                     <button
                         type="button"
                         aria-label="Delete task"
+                        title="Delete task"
                         class="delete-todo-btn w-8 h-8 rounded-xl border-2 border-[#78716c] bg-white text-[#44403c] hover:bg-[#fee2e2] hover:border-[#b91c1c] hover:text-[#b91c1c] active:scale-95 flex items-center justify-center transition-colors"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -906,6 +1042,26 @@
                     </button>
                 </div>
             `;
+
+            card.querySelector('.check-toggle-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleTodoItem(task.id, !task.checked);
+            });
+
+            card.querySelector('.task-text-area').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (expandedTodoIds.has(task.id)) {
+                    expandedTodoIds.delete(task.id);
+                } else {
+                    expandedTodoIds.add(task.id);
+                }
+                renderTodoTab();
+            });
+
+            card.querySelector('.edit-todo-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openEditTodoModal(task.id);
+            });
 
             card.querySelector('.star-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1167,12 +1323,9 @@
                             ` : ''}
                         </div>
 
-                        <span class="text-base font-bold leading-snug truncate pen-strike-wrap transition-colors duration-200 ${
+                        <span class="text-base font-bold leading-snug break-words pen-strike-wrap transition-colors duration-200 ${
                             item.checked ? 'text-[#78716c]' : 'text-[#1c1917]'
-                        }">
-                            ${escapeHtml(item.text)}
-                            <span class="pen-strike-line" aria-hidden="true"></span>
-                        </span>
+                        }">${escapeHtml(item.text)}<span class="pen-strike-line" aria-hidden="true"></span></span>
                     </div>
 
                     <button
@@ -1242,6 +1395,7 @@
         }
 
         function deleteTodoItem(id) {
+            expandedTodoIds.delete(id);
             todosData = todosData.filter((t) => t.id !== id);
             saveToStorage();
             renderTodoTab();
@@ -1393,6 +1547,38 @@
                 newTodoImportantBtn.className = 'rounded-2xl p-3 border-2 border-[#292524] bg-[#fffef5] text-[#78716c] shadow-[2px_2px_0px_#292524] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all shrink-0';
                 todoInput.focus();
             }
+        });
+
+        // Edit Task Modal Events
+        closeEditTodoBtn.addEventListener('click', closeEditTodoModal);
+        cancelEditTodoBtn.addEventListener('click', closeEditTodoModal);
+        editTodoModal.addEventListener('click', (e) => {
+            if (e.target === editTodoModal) closeEditTodoModal();
+        });
+
+        editTodoForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!editingTodoId) return;
+
+            const updatedText = editTodoTextInput.value.trim();
+            const updatedDateKey = editTodoDateInput.value || getTodayDateKey();
+            const updatedImportant = editTodoImportantInput.checked;
+
+            if (!updatedText) return;
+
+            const target = todosData.find((t) => t.id === editingTodoId);
+            if (target) {
+                target.text = updatedText;
+                target.dateKey = updatedDateKey;
+                target.important = updatedImportant;
+                selectedDateKey = updatedDateKey;
+                syncWeekOffsetToDateKey(updatedDateKey);
+                saveToStorage();
+                renderTodoTab();
+                showToast('Task updated');
+            }
+
+            closeEditTodoModal();
         });
 
         // Keep cursor locked inside the shopping input box after pressing Enter
