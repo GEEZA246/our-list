@@ -485,7 +485,7 @@
                     let suppressNextPush = false;
 
                     function getRoomDbRef() {
-                        const roomCode = (window.location.hash || '#DEFAULT').replace('#', '').trim().toUpperCase() || 'DEFAULT';
+                        const roomCode = (window.currentRoomCode || window.location.hash || '#DEFAULT').replace('#', '').trim().toUpperCase() || 'DEFAULT';
                         return ref(db, `rooms/${roomCode}`);
                     }
 
@@ -540,6 +540,7 @@
                     };
 
                     window.addEventListener('hashchange', subscribeToRoom);
+                    window.addEventListener('ourlist-room-changed', subscribeToRoom);
                     subscribeToRoom();
                 } catch (err) {
                     console.error('Live sync init error:', err);
@@ -578,21 +579,39 @@
         }
 
         /**
-         * Reads or initializes a room code from the URL hash or remembered device storage
-         * so Home Screen launches keep your room code instead of making a new random one.
+         * Detects if the app is running as a saved iOS/Android Home Screen web app.
          */
-        function getRoomId() {
-            let hash = window.location.hash.replace('#', '').replace(/[^A-Z0-9-]/gi, '').trim().toUpperCase();
-            if (!hash) {
-                const remembered = readSavedRoomCode();
-                hash = remembered || Math.random().toString(36).substring(2, 8).toUpperCase();
-                window.location.hash = hash;
-            }
-            writeSavedRoomCode(hash);
-            return hash;
+        function isStandaloneHomeScreenApp() {
+            return Boolean(window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
         }
 
-        let currentRoomId = getRoomId();
+        /**
+         * Reads or initializes the active room code.
+         * When launched from a saved Home Screen bookmark, prioritizes the last switched room code
+         * saved on the phone so an old code baked into the bookmark URL does not overwrite it.
+         */
+        function getRoomId(isInitialLaunch = false) {
+            const hash = window.location.hash.replace('#', '').replace(/[^A-Z0-9-]/gi, '').trim().toUpperCase();
+            const remembered = readSavedRoomCode();
+
+            if (isInitialLaunch && isStandaloneHomeScreenApp() && remembered) {
+                if (hash !== remembered) {
+                    window.location.hash = remembered;
+                }
+                window.currentRoomCode = remembered;
+                return remembered;
+            }
+
+            const activeCode = hash || remembered || Math.random().toString(36).substring(2, 8).toUpperCase();
+            if (hash !== activeCode) {
+                window.location.hash = activeCode;
+            }
+            writeSavedRoomCode(activeCode);
+            window.currentRoomCode = activeCode;
+            return activeCode;
+        }
+
+        let currentRoomId = getRoomId(true);
         let itemsData = [];
         let todosData = [];
         let activeTab = 'shopping';
@@ -1664,22 +1683,25 @@
             const newCode = joinCodeInput.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
             if (newCode) {
                 writeSavedRoomCode(newCode);
+                window.currentRoomCode = newCode;
                 window.location.hash = newCode;
                 currentRoomId = newCode;
                 joinCodeInput.value = '';
                 shareModal.classList.add('hidden');
                 initRoom();
+                window.dispatchEvent(new Event('ourlist-room-changed'));
                 showToast(`Switched to room: ${newCode}`);
             }
         });
 
         window.addEventListener('hashchange', () => {
-            currentRoomId = getRoomId();
+            currentRoomId = getRoomId(false);
             initRoom();
         });
 
         function initRoom() {
             writeSavedRoomCode(currentRoomId);
+            window.currentRoomCode = currentRoomId;
             listCodeDisplay.textContent = `Code: ${currentRoomId}`;
             shareUrlText.textContent = window.location.href;
             loadFromStorage();
