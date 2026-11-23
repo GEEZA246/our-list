@@ -483,6 +483,7 @@
                     }
 
                     let suppressNextPush = false;
+                    let hasReceivedCloudSnapshot = false;
 
                     function getRoomDbRef() {
                         const roomCode = (window.currentRoomCode || window.location.hash || '#DEFAULT').replace('#', '').trim().toUpperCase() || 'DEFAULT';
@@ -495,6 +496,7 @@
                     function subscribeToRoom() {
                         if (typeof unsubscribeValue === 'function') unsubscribeValue();
                         roomDbRef = getRoomDbRef();
+                        hasReceivedCloudSnapshot = false;
                         if (typeof window.__setLiveSyncStatus === 'function') {
                             window.__setLiveSyncStatus('connecting');
                         }
@@ -503,12 +505,16 @@
                             if (typeof window.__setLiveSyncStatus === 'function') {
                                 window.__setLiveSyncStatus('live');
                             }
-                            if (!snap.exists()) return;
+                            if (!snap.exists()) {
+                                hasReceivedCloudSnapshot = true;
+                                return;
+                            }
                             const remote = snap.val();
                             const remoteShopping = Array.isArray(remote.shopping) ? remote.shopping : [];
                             const remoteTodos = Array.isArray(remote.todos) ? remote.todos : [];
                             if (typeof window.__applyRemoteRoomData === 'function') {
                                 suppressNextPush = true;
+                                hasReceivedCloudSnapshot = true;
                                 window.__applyRemoteRoomData(remoteShopping, remoteTodos);
                                 setTimeout(() => { suppressNextPush = false; }, 120);
                             }
@@ -522,10 +528,18 @@
 
                     window.__pushRoomDataToCloud = async function (shoppingList, todoList) {
                         if (suppressNextPush) return;
+                        const safeShopping = Array.isArray(shoppingList) ? shoppingList : [];
+                        const safeTodos = Array.isArray(todoList) ? todoList : [];
+
+                        // Avoid pushing blank initial lists before the room's cloud snapshot arrives
+                        if (!hasReceivedCloudSnapshot && safeShopping.length === 0 && safeTodos.length === 0) {
+                            return;
+                        }
+
                         try {
                             await set(roomDbRef, {
-                                shopping: shoppingList,
-                                todos: todoList,
+                                shopping: safeShopping,
+                                todos: safeTodos,
                                 updatedAt: Date.now()
                             });
                             if (typeof window.__setLiveSyncStatus === 'function') {
@@ -742,8 +756,6 @@
                 } else {
                     todosData = [];
                 }
-
-                saveToStorage();
             } catch (err) {
                 console.error('Failed to load from localStorage:', err);
                 itemsData = [];
