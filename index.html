@@ -463,8 +463,17 @@
                         });
                     } catch (authErr) {
                         const code = authErr && authErr.code ? authErr.code : '';
-                        if (code === 'auth/permission-denied-on-the-service.' || code === 'auth/operation-not-allowed') {
-                            console.warn('Anonymous auth not enabled for this origin; using local storage mode.');
+                        const message = authErr && authErr.message ? authErr.message : '';
+                        const isBlockedOrDisabledAuth =
+                            code === 'auth/permission-denied-on-the-service.' ||
+                            code === 'auth/operation-not-allowed' ||
+                            code === 'auth/requests-from-referer-' ||
+                            code.indexOf('auth/requests-from-referer-') === 0 ||
+                            message.indexOf('requests-from-referer-') !== -1 ||
+                            message.indexOf('are-blocked') !== -1;
+
+                        if (isBlockedOrDisabledAuth) {
+                            console.warn('Firebase Auth blocked for this referer/origin; using local storage mode.');
                             if (typeof window.__setLiveSyncStatus === 'function') {
                                 window.__setLiveSyncStatus('local');
                             }
@@ -546,16 +555,40 @@
 
     <!-- Self-Contained Local Storage App Logic -->
     <script>
+        const SAVED_ROOM_STORAGE_KEY = 'our_list_saved_room_code';
+
+        function readSavedRoomCode() {
+            try {
+                const raw = localStorage.getItem(SAVED_ROOM_STORAGE_KEY) || '';
+                return raw.replace(/[^A-Z0-9-]/gi, '').trim().toUpperCase();
+            } catch (err) {
+                return '';
+            }
+        }
+
+        function writeSavedRoomCode(roomCode) {
+            try {
+                const clean = String(roomCode || '').replace(/[^A-Z0-9-]/gi, '').trim().toUpperCase();
+                if (clean) {
+                    localStorage.setItem(SAVED_ROOM_STORAGE_KEY, clean);
+                }
+            } catch (err) {
+                console.error('Failed to save room code:', err);
+            }
+        }
+
         /**
-         * Reads or initializes a room code from the URL hash so each room
-         * can keep its own separate localStorage bucket.
+         * Reads or initializes a room code from the URL hash or remembered device storage
+         * so Home Screen launches keep your room code instead of making a new random one.
          */
         function getRoomId() {
-            let hash = window.location.hash.replace('#', '').trim().toUpperCase();
+            let hash = window.location.hash.replace('#', '').replace(/[^A-Z0-9-]/gi, '').trim().toUpperCase();
             if (!hash) {
-                hash = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const remembered = readSavedRoomCode();
+                hash = remembered || Math.random().toString(36).substring(2, 8).toUpperCase();
                 window.location.hash = hash;
             }
+            writeSavedRoomCode(hash);
             return hash;
         }
 
@@ -1630,6 +1663,7 @@
             e.preventDefault();
             const newCode = joinCodeInput.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
             if (newCode) {
+                writeSavedRoomCode(newCode);
                 window.location.hash = newCode;
                 currentRoomId = newCode;
                 joinCodeInput.value = '';
@@ -1645,6 +1679,7 @@
         });
 
         function initRoom() {
+            writeSavedRoomCode(currentRoomId);
             listCodeDisplay.textContent = `Code: ${currentRoomId}`;
             shareUrlText.textContent = window.location.href;
             loadFromStorage();
