@@ -331,7 +331,7 @@
                     </button>
                 </div>
                 <p class="text-sm text-[#44403c] font-medium leading-relaxed mb-4">
-                    This standalone version saves data locally in your browser. You can copy this link or switch room codes in the URL hash.
+                    Share this link or switch room codes to match your list with your wife. When live sync is connected, changes update right away on both sides.
                 </p>
 
                 <div class="bg-[#fef9c3] p-3 rounded-2xl flex items-center justify-between gap-2 mb-4 border-2 border-[#292524]">
@@ -358,61 +358,98 @@
         </div>
     </div>
 
-    <!-- Optional Live Sync Cloud Config (paste your own config here to sync across phones) -->
+    <!-- Live Sync Cloud Config (Realtime Database + Anonymous Auth) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
-        // Leave as null to use local browser storage, or paste your project config object to enable live sync:
-        const LIVE_SYNC_CONFIG = null;
-        const LIVE_SYNC_APP_ID = 'our-list-live';
+        const LIVE_SYNC_CONFIG = {
+            apiKey: "AIzaSyBsQb11A5cG9wIxIs9s406FIJGaUUyQzIk",
+            authDomain: "family-list-bc804.firebaseapp.com",
+            databaseURL: "https://family-list-bc804-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "family-list-bc804",
+            storageBucket: "family-list-bc804.firebasestorage.app",
+            messagingSenderId: "1076384981384",
+            appId: "1:1076384981384:web:75c9607127cd16ef565a3d"
+        };
 
         if (LIVE_SYNC_CONFIG && LIVE_SYNC_CONFIG.apiKey) {
             (async () => {
                 try {
                     const app = initializeApp(LIVE_SYNC_CONFIG);
                     const auth = getAuth(app);
-                    const db = getFirestore(app);
+                    const db = getDatabase(app);
+
+                    if (typeof window.__setLiveSyncStatus === 'function') {
+                        window.__setLiveSyncStatus('connecting');
+                    }
+
                     await signInAnonymously(auth);
+                    await new Promise((resolve) => {
+                        if (auth.currentUser) return resolve();
+                        const stop = onAuthStateChanged(auth, (u) => {
+                            if (u) {
+                                stop();
+                                resolve();
+                            }
+                        });
+                    });
 
                     let suppressNextPush = false;
 
-                    function getRoomDocRef() {
+                    function getRoomDbRef() {
                         const roomCode = (window.location.hash || '#DEFAULT').replace('#', '').trim().toUpperCase() || 'DEFAULT';
-                        return doc(db, 'artifacts', LIVE_SYNC_APP_ID, 'public', 'data', 'rooms', roomCode);
+                        return ref(db, `rooms/${roomCode}`);
                     }
 
-                    let roomDocRef = getRoomDocRef();
-                    let unsubscribeSnapshot = null;
+                    let roomDbRef = getRoomDbRef();
+                    let unsubscribeValue = null;
 
                     function subscribeToRoom() {
-                        if (unsubscribeSnapshot) unsubscribeSnapshot();
-                        roomDocRef = getRoomDocRef();
-                        unsubscribeSnapshot = onSnapshot(roomDocRef, (snap) => {
+                        if (typeof unsubscribeValue === 'function') unsubscribeValue();
+                        roomDbRef = getRoomDbRef();
+                        if (typeof window.__setLiveSyncStatus === 'function') {
+                            window.__setLiveSyncStatus('connecting');
+                        }
+
+                        unsubscribeValue = onValue(roomDbRef, (snap) => {
+                            if (typeof window.__setLiveSyncStatus === 'function') {
+                                window.__setLiveSyncStatus('live');
+                            }
                             if (!snap.exists()) return;
-                            const remote = snap.data();
-                            if (!Array.isArray(remote.shopping) || !Array.isArray(remote.todos)) return;
+                            const remote = snap.val();
+                            const remoteShopping = Array.isArray(remote.shopping) ? remote.shopping : [];
+                            const remoteTodos = Array.isArray(remote.todos) ? remote.todos : [];
                             if (typeof window.__applyRemoteRoomData === 'function') {
                                 suppressNextPush = true;
-                                window.__applyRemoteRoomData(remote.shopping, remote.todos);
+                                window.__applyRemoteRoomData(remoteShopping, remoteTodos);
                                 setTimeout(() => { suppressNextPush = false; }, 120);
                             }
                         }, (err) => {
                             console.error('Live sync listener error:', err);
+                            if (typeof window.__setLiveSyncStatus === 'function') {
+                                window.__setLiveSyncStatus('error');
+                            }
                         });
                     }
 
                     window.__pushRoomDataToCloud = async function (shoppingList, todoList) {
                         if (suppressNextPush) return;
                         try {
-                            await setDoc(roomDocRef, {
+                            await set(roomDbRef, {
                                 shopping: shoppingList,
                                 todos: todoList,
                                 updatedAt: Date.now()
-                            }, { merge: true });
+                            });
+                            if (typeof window.__setLiveSyncStatus === 'function') {
+                                window.__setLiveSyncStatus('live');
+                            }
                         } catch (err) {
                             console.error('Live sync push error:', err);
+                            if (typeof window.__setLiveSyncStatus === 'function') {
+                                window.__setLiveSyncStatus('error');
+                            }
                         }
                     };
 
@@ -420,8 +457,13 @@
                     subscribeToRoom();
                 } catch (err) {
                     console.error('Live sync init error:', err);
+                    if (typeof window.__setLiveSyncStatus === 'function') {
+                        window.__setLiveSyncStatus('error');
+                    }
                 }
             })();
+        } else if (typeof window.__setLiveSyncStatus === 'function') {
+            window.__setLiveSyncStatus('local');
         }
     </script>
 
@@ -1419,12 +1461,27 @@
         function initRoom() {
             listCodeDisplay.textContent = `Code: ${currentRoomId}`;
             shareUrlText.textContent = window.location.href;
-            syncDot.classList.remove('bg-amber-500');
-            syncDot.classList.add('bg-[#16a34a]');
             loadFromStorage();
             renderList();
             renderTodoTab();
         }
+
+        window.__setLiveSyncStatus = function (status) {
+            syncDot.classList.remove('bg-amber-500', 'bg-[#16a34a]', 'bg-[#dc2626]');
+            if (status === 'live') {
+                syncDot.classList.add('bg-[#16a34a]');
+                syncDot.title = 'Live sync active';
+            } else if (status === 'error') {
+                syncDot.classList.add('bg-[#dc2626]');
+                syncDot.title = 'Live sync error — check cloud database setup';
+            } else if (status === 'connecting') {
+                syncDot.classList.add('bg-amber-500');
+                syncDot.title = 'Connecting live sync...';
+            } else {
+                syncDot.classList.add('bg-amber-500');
+                syncDot.title = 'Local only (live sync not connected yet)';
+            }
+        };
 
         window.__applyRemoteRoomData = function (remoteShopping, remoteTodos) {
             itemsData = remoteShopping;
